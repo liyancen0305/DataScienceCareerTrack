@@ -107,4 +107,8 @@ Order by truecost
 /* Q10: Produce a list of facilities with a total revenue less than 1000.
 The output of facility name and total revenue, sorted by revenue. Remember
 that there's a different cost for guests and members! */
-
+Select f.name, revenue from Bookings b
+Left Join Faciliites f on b.facid = f.facid
+Left Join Members m on b.memid = m.memid
+SUM(CASE WHEN memid = 0 THEN guestcost * slots ELSE membercost * slots END) AS revenue
+Order by revenue

@@ -37,7 +37,7 @@ where the fee is less than 20% of the facility's monthly maintenance cost?
 Return the facid, facility name, member cost, and monthly maintenance of the
 facilities in question. */
 SELECT `facid`,`name`,`membercost`,`monthlymaintenance` FROM `Facilities`
-WHERE `membercost` < `monthlymaintenance` * .2
+WHERE `membercost` < `monthlymaintenance` * .2 And `membercost` > 0
 
 
 
@@ -45,6 +45,9 @@ WHERE `membercost` < `monthlymaintenance` * .2
 Write the query without using the OR operator. */
 
 SELECT * FROM `Facilities` WHERE ABS(facid - 3) = 2
+
+SELECT * FROM `Facilities` WHERE facid in (1,5)
+
 
 /* Q5: How can you produce a list of facilities, with each labelled as
 'cheap' or 'expensive', depending on if their monthly maintenance cost is
@@ -59,7 +62,7 @@ from Facilities
 
 /* Q6: You'd like to get the first and last name of the last member(s)
 who signed up. Do not use the LIMIT clause for your solution. */
-SELECT `surname`,`firstname` FROM Members 
+SELECT `firstname`,`surname` FROM Members 
 WHERE joindate=(select max(joindate) from Members)
 
 /* Q7: How can you produce a list of all members who have used a tennis court?
@@ -67,11 +70,12 @@ Include in your output the name of the court, and the name of the member
 formatted as a single column. Ensure no duplicate data, and order by
 the member name. */
 
-Select distinct f.name, concat(m.firstname, ', ', m.surname) as name from Bookings b
+Select distinct f.name as Facility_Name, concat(m.firstname, ', ', m.surname) as Name from Bookings b
 Left Join Facilities f on b.facid = f.facid
 Left Join Members m on b.memid = m.memid
 Where f.name like '%Tennis Court%'
-Order by m.surname
+Order by Name
+
 
 
 /* Q8: How can you produce a list of bookings on the day of 2012-09-14 which
@@ -81,34 +85,45 @@ the guest user's ID is always 0. Include in your output the name of the
 facility, the name of the member formatted as a single column, and the cost.
 Order by descending cost, and do not use any subqueries. */
 
-Select f.name, concat(m.firstname, ', ', m.surname), (f.guestcost * (b.memid = 0)) + (f.membercost * (b.memid != 0)) as truecost from Bookings b
-Left Join Facilities f on b.facid = f.facid
-Left Join Members m on b.memid = m.memid
-Where b.starttime like '%2012-09-14%'
-AND (f.membercost >= 30 OR b.memid = 0)
-AND (f.guestcost >= 30 OR b.memid != 0)
-Order by truecost
+SELECT
+concat(firstname, surname) AS member,
+name AS facility,
+CASE WHEN firstname = 'GUEST' THEN guestcost * slots ELSE membercost * slots END AS cost
+
+FROM Members
+INNER JOIN Bookings
+ON Members.memid = Bookings.memid
+INNER JOIN Facilities
+ON Bookings.facid = Facilities.facid
+
+WHERE starttime >= '2012-09-14' AND starttime < '2012-09-15'
+AND CASE WHEN firstname = 'GUEST' THEN guestcost * slots ELSE membercost * slots END > 30
+ORDER BY cost DESC;
 
 /* Q9: This time, produce the same result as in Q8, but using a subquery. */
-SELECT fname, name,
-CASE
-WHEN memid = 0 THEN guestcost
-ELSE membercost
-END as truecost
+
+SELECT
+fname, name,
+CASE WHEN name = 'GUEST' THEN guestcost * slots ELSE membercost * slots END AS cost
 FROM
-(Select f.name as fname, concat(m.firstname, ', ', m.surname) as name, b.memid, f.membercost, f.guestcost from Bookings b
-Left Join Facilities f on b.facid = f.facid
-Left Join Members m on b.memid = m.memid
-Where b.starttime like '%2012-09-14%'
-AND (f.membercost >= 30 OR b.memid = 0)
-AND (f.guestcost >= 30 OR b.memid != 0)) sub
-Order by truecost
+(select Facilities.name as fname, concat(Members.firstname, ',', Members.surname) as name, Facilities.guestcost, Facilities.membercost, Bookings.slots from Bookings
+
+INNER JOIN Members
+ON Members.memid = Bookings.memid
+INNER JOIN Facilities
+ON Bookings.facid = Facilities.facid
+
+WHERE Bookings.starttime >= '2012-09-14' AND Bookings.starttime < '2012-09-15'
+AND CASE WHEN Members.firstname = 'GUEST' THEN Facilities.guestcost * Bookings.slots ELSE Facilities.membercost * Bookings.slots END > 30) sub
+
+ORDER BY cost DESC
 
 /* Q10: Produce a list of facilities with a total revenue less than 1000.
 The output of facility name and total revenue, sorted by revenue. Remember
 that there's a different cost for guests and members! */
-Select f.name, revenue from Bookings b
-Left Join Faciliites f on b.facid = f.facid
-Left Join Members m on b.memid = m.memid
-SUM(CASE WHEN memid = 0 THEN guestcost * slots ELSE membercost * slots END) AS revenue
-Order by revenue
+
+Select f.name, SUM(CASE WHEN memid = 0 THEN guestcost * slots ELSE membercost * slots END) AS revenue from Bookings b
+Left Join Facilities f on b.facid = f.facid
+group by name
+having revenue < 1000
+order by revenue
